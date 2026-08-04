@@ -137,6 +137,16 @@ const Wind = (p) => (
     <path d="M17.7 7.7A2.5 2.5 0 1 1 19.5 12H2" />
   </Icone>
 );
+const Coeur = ({ size = 18, rempli }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24">
+    <path
+      d="M12 21s-6.7-4.35-9.3-8.1C1.1 10.5 1 8 2.8 6.2 4.4 4.6 7 4.6 8.6 6.2L12 9.6l3.4-3.4c1.6-1.6 4.2-1.6 5.8 0 1.8 1.8 1.7 4.3.1 6.7C18.7 16.65 12 21 12 21z"
+      fill={rempli ? "#B8434A" : "none"}
+      stroke={rempli ? "#B8434A" : "#C9BBA8"}
+      strokeWidth={rempli ? 0 : 1.5}
+    />
+  </svg>
+);
 
 // --- persistance locale (localStorage du téléphone) ---
 function chargerLS(cle, defaut) {
@@ -310,6 +320,60 @@ const CITATIONS = [
   { texte: "On oubliera ce que tu as dit, mais jamais ce que tu as fait ressentir.", auteur: "Maya Angelou" },
 ];
 
+const RECOMPENSES_SERIE = [
+  "Une semaine complète ! Offre-toi un carré de chocolat rien que pour toi.",
+  "7 jours de suite : accorde-toi 10 minutes de musique, les yeux fermés.",
+  "Régularité parfaite cette semaine — prépare-toi une boisson chaude sans culpabilité.",
+  "Tu as tenu toute la semaine : mets ta chanson préférée à fond.",
+  "Sept jours d'affilée. Va prendre l'air cinq minutes, juste pour toi.",
+  "Belle constance ! Offre-toi une pause sans notifications ce soir.",
+  "Une semaine entière de suite : relis un souvenir qui te fait sourire.",
+  "7/7 ! Autorise-toi une sieste de 15 minutes sans culpabiliser.",
+  "Ta régularité paie : commande ton plat préféré ce soir.",
+  "Une semaine sans faillir : appelle quelqu'un que tu aimes juste pour dire bonjour.",
+  "7 jours de suite : allume une bougie et savoure un moment de calme.",
+  "Constance parfaite ! Fais-toi un compliment à voix haute, tu l'as mérité.",
+  "Une semaine complète : offre-toi 20 minutes de lecture plaisir.",
+  "7/7 ! Prends une douche un peu plus longue que d'habitude, sans te presser.",
+  "Belle assiduité : regarde un épisode de plus que prévu, sans remords.",
+  "Une semaine entière : marche dehors sans ton téléphone quelques minutes.",
+  "7 jours de suite : prépare-toi une boisson que tu adores et savoure-la lentement.",
+  "Ta régularité mérite une récompense : dis-toi un vrai bravo aujourd'hui.",
+  "Une semaine sans interruption : accorde-toi le droit de ne rien faire ce soir.",
+  "7/7 ! Écris une chose dont tu es fier ou fière cette semaine.",
+  "Constance au rendez-vous : offre-toi un dessert que tu aimes vraiment.",
+  "Une semaine complète : prends un bain ou une douche rien que pour te détendre.",
+  "7 jours de suite : envoie-toi une note vocale d'encouragement pour plus tard.",
+  "Belle semaine de régularité : accorde-toi une heure sans obligations.",
+];
+
+function tirerRecompenseSerie(dejaUtilisees) {
+  let disponibles = RECOMPENSES_SERIE.filter((r) => !dejaUtilisees.includes(r));
+  if (disponibles.length === 0) disponibles = RECOMPENSES_SERIE.slice();
+  return disponibles[Math.floor(Math.random() * disponibles.length)];
+}
+
+function calculerNouvelleSerie(precedent, aujourdHuiCle) {
+  if (!precedent || !precedent.dernierJour) {
+    return { serie: { dernierJour: aujourdHuiCle, streak: 1 }, recompenseDeclenchee: false };
+  }
+  if (precedent.dernierJour === aujourdHuiCle) {
+    return { serie: precedent, recompenseDeclenchee: false };
+  }
+  const hier = new Date(aujourdHuiCle + "T00:00:00");
+  hier.setDate(hier.getDate() - 1);
+  const hierCle = cleDate(hier);
+  let nouveauStreak;
+  if (precedent.streak >= 7) {
+    nouveauStreak = 1;
+  } else if (precedent.dernierJour === hierCle) {
+    nouveauStreak = precedent.streak + 1;
+  } else {
+    nouveauStreak = 1;
+  }
+  return { serie: { dernierJour: aujourdHuiCle, streak: nouveauStreak }, recompenseDeclenchee: nouveauStreak === 7 };
+}
+
 function estBissextile(annee) {
   return (annee % 4 === 0 && annee % 100 !== 0) || annee % 400 === 0;
 }
@@ -340,6 +404,7 @@ const ENTREE_VIDE = {
   motivation: null,
   objectifJour: "",
   gratitude: "",
+  todos: [],
 };
 
 function objectifAnneeVide() {
@@ -415,6 +480,7 @@ function JournalPrototype() {
   const [objectifsAnnee, setObjectifsAnnee] = useState(() => chargerLS("carnetDevPerso_objectifsAnnee", {}));
   const [projetsMois, setProjetsMois] = useState(() => chargerLS("carnetDevPerso_projetsMois", {}));
   const [gratitudeOuverte, setGratitudeOuverte] = useState(false);
+  const [nouvelleTache, setNouvelleTache] = useState("");
   const [nouveauPas, setNouveauPas] = useState({ texte: "", date: "", recompense: "" });
   const [pasEnEdition, setPasEnEdition] = useState(null);
   const [recompensesListe, setRecompensesListe] = useState(() => chargerLS("carnetDevPerso_recompenses", RECOMPENSES_DEFAUT));
@@ -423,6 +489,9 @@ function JournalPrototype() {
   const [moodboards, setMoodboards] = useState(() => chargerLS("carnetDevPerso_moodboards", []));
   const [brouillonMood, setBrouillonMood] = useState(null);
   const [anneeMemoire, setAnneeMemoire] = useState(2026);
+  const [serieOuverture, setSerieOuverture] = useState(() => chargerLS("carnetDevPerso_serie", { dernierJour: null, streak: 0 }));
+  const [recompensesSerieUtilisees, setRecompensesSerieUtilisees] = useState(() => chargerLS("carnetDevPerso_serieRecompensesUtilisees", []));
+  const [recompenseSerie, setRecompenseSerie] = useState(null);
 
   useEffect(() => {
     if (vue.type !== "moodboards" && vue.type !== "moodboard-detail") {
@@ -430,17 +499,35 @@ function JournalPrototype() {
     }
   }, [vue]);
 
+  useEffect(() => {
+    const aujourdHuiCle = cleDate(new Date());
+    const { serie, recompenseDeclenchee } = calculerNouvelleSerie(serieOuverture, aujourdHuiCle);
+    if (serie.dernierJour !== serieOuverture.dernierJour || serie.streak !== serieOuverture.streak) {
+      setSerieOuverture(serie);
+    }
+    if (recompenseDeclenchee) {
+      const choix = tirerRecompenseSerie(recompensesSerieUtilisees);
+      setRecompenseSerie(choix);
+      setRecompensesSerieUtilisees((prev) => {
+        const maj = prev.includes(choix) ? prev : [...prev, choix];
+        return maj.length >= RECOMPENSES_SERIE.length ? [] : maj;
+      });
+    }
+  }, []);
+
   useEffect(() => { sauvegarderLS("carnetDevPerso_entrees", entrees); }, [entrees]);
   useEffect(() => { sauvegarderLS("carnetDevPerso_objectifsAnnee", objectifsAnnee); }, [objectifsAnnee]);
   useEffect(() => { sauvegarderLS("carnetDevPerso_projetsMois", projetsMois); }, [projetsMois]);
   useEffect(() => { sauvegarderLS("carnetDevPerso_recompenses", recompensesListe); }, [recompensesListe]);
   useEffect(() => { sauvegarderLS("carnetDevPerso_moodboards", moodboards); }, [moodboards]);
+  useEffect(() => { sauvegarderLS("carnetDevPerso_serie", serieOuverture); }, [serieOuverture]);
+  useEffect(() => { sauvegarderLS("carnetDevPerso_serieRecompensesUtilisees", recompensesSerieUtilisees); }, [recompensesSerieUtilisees]);
 
   const cleAuj = cleDate(aujourdHui);
   const annee = vueAnnee(vue);
   const moisActifIdx = vueMois(vue);
 
-  const getEntree = (d) => entrees[cleDate(d)] || ENTREE_VIDE;
+  const getEntree = (d) => ({ ...ENTREE_VIDE, ...(entrees[cleDate(d)] || {}) });
   const majEntree = (d, partiel) => {
     const k = cleDate(d);
     setEntrees((prev) => ({ ...prev, [k]: { ...(prev[k] || ENTREE_VIDE), ...partiel } }));
@@ -507,6 +594,22 @@ function JournalPrototype() {
     const copie = [...entree.savers];
     copie[idx] = !copie[idx];
     majEntree(vue.date, { savers: copie });
+  };
+
+  const ajouterTache = (date) => {
+    if (!nouvelleTache.trim()) return;
+    const entree = getEntree(date);
+    const tache = { id: Date.now() + Math.random(), texte: nouvelleTache.trim(), fait: false };
+    majEntree(date, { todos: [...entree.todos, tache] });
+    setNouvelleTache("");
+  };
+  const toggleTache = (date, id) => {
+    const entree = getEntree(date);
+    majEntree(date, { todos: entree.todos.map((t) => (t.id === id ? { ...t, fait: !t.fait } : t)) });
+  };
+  const supprimerTache = (date, id) => {
+    const entree = getEntree(date);
+    majEntree(date, { todos: entree.todos.filter((t) => t.id !== id) });
   };
 
   const allerSuivant = () => setVue(vueSuivante(vue));
@@ -613,6 +716,13 @@ function JournalPrototype() {
         </div>
         <div className="text-[11px] tracking-wide mb-6" style={{ color: "#A69884" }}>
           Page {pageNum} / {totalPages}
+        </div>
+
+        <div className="flex items-center gap-2 mb-8">
+          {Array.from({ length: 7 }, (_, i) => i + 1).map((n) => (
+            <Coeur key={n} size={20} rempli={n <= serieOuverture.streak} />
+          ))}
+          <span className="text-[10px] ml-1" style={{ color: "#A69884" }}>{serieOuverture.streak}/7</span>
         </div>
 
         {/* Progression objectif de l'année */}
@@ -728,6 +838,40 @@ function JournalPrototype() {
             {entree.gratitude ? entree.gratitude.split("\n")[0].slice(0, 60) + (entree.gratitude.length > 60 ? "…" : "") : "Appuie ici pour commencer l'exercice"}
           </div>
         </button>
+
+        <SectionLabel>To-do</SectionLabel>
+        <div className="flex flex-col gap-1.5 mb-3">
+          {entree.todos.length === 0 && (
+            <p className="text-xs italic mb-1" style={{ color: "#B3A48F" }}>Aucune tâche pour aujourd'hui.</p>
+          )}
+          {entree.todos.map((t) => (
+            <div key={t.id} className="flex items-center gap-2.5">
+              <button onClick={() => toggleTache(date, t.id)} className="flex items-center justify-center rounded-full flex-shrink-0 transition-all"
+                style={{ width: 20, height: 20, background: t.fait ? "#B8863B" : "transparent", border: `1.5px solid ${t.fait ? "#B8863B" : "#C9BBA8"}` }}>
+                {t.fait && <Check size={12} color="#FBF7EE" />}
+              </button>
+              <span className="flex-1 text-sm" style={{ color: t.fait ? "#A69884" : "#2A231C", textDecoration: t.fait ? "line-through" : "none" }}>
+                {t.texte}
+              </span>
+              <button onClick={() => supprimerTache(date, t.id)} className="opacity-40 hover:opacity-100 transition-opacity flex-shrink-0" aria-label="Supprimer">
+                <Trash2 size={13} color="#8B4A2B" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 mb-8">
+          <input
+            value={nouvelleTache}
+            onChange={(e) => setNouvelleTache(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && ajouterTache(date)}
+            placeholder="Nouvelle tâche..."
+            className="flex-1 px-2 py-1.5 rounded-sm text-sm outline-none"
+            style={{ background: "#EFE7D6", border: "1px solid rgba(107,79,46,0.15)", color: "#2A231C" }}
+          />
+          <button onClick={() => ajouterTache(date)} className="flex items-center justify-center rounded-full flex-shrink-0" style={{ width: 30, height: 30, background: "#B8863B" }} aria-label="Ajouter la tâche">
+            <Plus size={14} color="#FBF7EE" />
+          </button>
+        </div>
 
         <SectionLabel>Citation du jour</SectionLabel>
         <div className="mb-4">
@@ -1132,6 +1276,34 @@ function JournalPrototype() {
           </div>
         </div>
       )}
+
+      {/* pop-up récompense de série (7 cœurs) */}
+      {recompenseSerie && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center px-8"
+          style={{ background: "rgba(36,30,27,0.94)" }}
+          onClick={() => setRecompenseSerie(null)}
+        >
+          <div className="text-xs uppercase tracking-[0.3em] mb-6" style={{ color: "#E8B84B" }}>
+            7 jours d'affilée !
+          </div>
+          <div
+            className="flex items-center justify-center text-center"
+            style={{
+              width: 280,
+              height: 280,
+              background: "linear-gradient(135deg, #E8B84B, #B8863B)",
+              clipPath: "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)",
+              boxShadow: "0 0 70px rgba(232,184,75,0.55)",
+            }}
+          >
+            <p style={{ color: "#2A231C", fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: "0.9rem", lineHeight: 1.35, maxWidth: 165 }}>
+              {recompenseSerie}
+            </p>
+          </div>
+          <p className="text-xs italic mt-8" style={{ color: "#C9BBA8" }}>(touche l'écran pour continuer)</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -1274,8 +1446,45 @@ function RecompenseSelect({ value, onChange, compact, options }) {
   );
 }
 
+class LimiteurErreur extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { erreur: null };
+  }
+  static getDerivedStateFromError(erreur) {
+    return { erreur };
+  }
+  render() {
+    if (this.state.erreur) {
+      return (
+        <div style={{ minHeight: "100vh", background: "#241E1B", color: "#EFE7D8", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px", textAlign: "center", fontFamily: "ui-serif, Georgia, serif" }}>
+          <div style={{ fontSize: "1.3rem", marginBottom: "12px" }}>Un souci est survenu 🙁</div>
+          <p style={{ color: "#C9BBA8", fontSize: "0.9rem", marginBottom: "20px", maxWidth: "320px" }}>
+            L'application a rencontré une erreur inattendue. Tes données sont toujours enregistrées sur ton téléphone.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ background: "#B8863B", color: "#FBF7EE", padding: "10px 24px", borderRadius: "999px", border: "none", fontSize: "0.9rem", marginBottom: "16px" }}
+          >
+            Recharger
+          </button>
+          <details style={{ color: "#8B7C68", fontSize: "0.7rem", maxWidth: "320px" }}>
+            <summary>Détail technique (à envoyer si besoin d'aide)</summary>
+            <pre style={{ whiteSpace: "pre-wrap", textAlign: "left", marginTop: "8px" }}>{String(this.state.erreur && this.state.erreur.message)}</pre>
+          </details>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const racine = ReactDOM.createRoot(document.getElementById("root"));
-racine.render(<JournalPrototype />);
+racine.render(
+  <LimiteurErreur>
+    <JournalPrototype />
+  </LimiteurErreur>
+);
 
 </script>
 </body>
