@@ -35,7 +35,25 @@
 </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root">
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#241E1B;color:#C9BBA8;font-family:ui-serif,Georgia,serif;font-size:0.9rem;">
+    Chargement du carnet…
+  </div>
+</div>
+<script>
+  window.onerror = function (msg, url, line, col, error) {
+    var root = document.getElementById("root");
+    if (root) {
+      root.innerHTML =
+        '<div style="min-height:100vh;background:#241E1B;color:#EFE7D8;padding:28px;font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap;line-height:1.5;">' +
+        '<div style="font-size:16px;margin-bottom:12px;">Erreur détectée :</div>' +
+        String(msg).replace(/</g, "&lt;") +
+        "\n(ligne " + line + ", colonne " + col + ")" +
+        "</div>";
+    }
+    return false;
+  };
+</script>
 
 <script type="text/babel" data-presets="react">
 const { useState, useMemo, useEffect } = React;
